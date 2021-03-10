@@ -14,6 +14,24 @@ from utils.parser import get_config
 from utils.log import get_logger
 from utils.io import write_results
 
+
+def _xyxy2xywh(bbox_xyxy):
+    """Transform the bbox format from x1y1x2y2 to xywh.
+
+    Args:
+        bbox_xyxy (np.ndarray): Bounding boxes (with scores), shaped (n, 4) or
+            (n, 5). (left, top, right, bottom, [score])
+
+    Returns:
+        np.ndarray: Bounding boxes (with scores),
+          shaped (n, 4) or (n, 5). (left, top, width, height, [score])
+    """
+    bbox_xywh = bbox_xyxy.copy()
+    bbox_xywh[:, 2] = bbox_xywh[:, 2] - bbox_xywh[:, 0] + 1
+    bbox_xywh[:, 3] = bbox_xywh[:, 3] - bbox_xywh[:, 1] + 1
+    return bbox_xywh
+
+
 def process_mmdet_results(mmdet_results, cat_id=0):
     """Process mmdet results, and return a list of bboxes.
 
@@ -27,13 +45,15 @@ def process_mmdet_results(mmdet_results, cat_id=0):
         det_results = mmdet_results
 
     persons = det_results[cat_id]
+    persons[~np.isinf(persons).any(axis=1)]
     # infinit = np.isinf(persons)
 
-    bboxes = persons[:, :4]
+    bboxes = _xyxy2xywh(persons[:, :4])
     confs = persons[:, 4]
     ids = np.zeros(len(persons), dtype=np.int64)
 
     return bboxes, confs, ids
+
 
 class VideoTracker(object):
     def __init__(self, cfg, args, video_path):
@@ -56,7 +76,7 @@ class VideoTracker(object):
         else:
             self.vdo = cv2.VideoCapture()
         self.detector = build_detector(cfg, use_cuda=use_cuda)
-        self.config_file = '../mmdetection/configs/yolo/yolov3_d53_mstrain-608_273e_coco.py'
+        self.config_file = '../../mmdetection/configs/yolo/yolov3_d53_mstrain-608_273e_coco.py'
         self.detector_2 = init_detector(self.config_file, device="cuda:0")
         self.deepsort = build_tracker(cfg, use_cuda=use_cuda)
         self.class_names = self.detector.class_names
