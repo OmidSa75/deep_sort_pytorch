@@ -6,6 +6,7 @@ import torch
 import warnings
 import numpy as np
 
+from mmdet.apis import init_detector, inference_detector
 from detector import build_detector
 from deep_sort import build_tracker
 from utils.draw import draw_boxes
@@ -13,6 +14,26 @@ from utils.parser import get_config
 from utils.log import get_logger
 from utils.io import write_results
 
+def process_mmdet_results(mmdet_results, cat_id=0):
+    """Process mmdet results, and return a list of bboxes.
+
+    :param mmdet_results:
+    :param cat_id: category id (default: 0 for human)
+    :return: a list of detected bounding boxes
+    """
+    if isinstance(mmdet_results, tuple):
+        det_results = mmdet_results[0]
+    else:
+        det_results = mmdet_results
+
+    persons = det_results[cat_id]
+    # infinit = np.isinf(persons)
+
+    bboxes = persons[:, :4]
+    confs = persons[:, 4]
+    ids = np.zeros(len(persons), dtype=np.int64)
+
+    return bboxes, confs, ids
 
 class VideoTracker(object):
     def __init__(self, cfg, args, video_path):
@@ -35,6 +56,8 @@ class VideoTracker(object):
         else:
             self.vdo = cv2.VideoCapture()
         self.detector = build_detector(cfg, use_cuda=use_cuda)
+        self.config_file = '../mmdetection/configs/yolo/yolov3_d53_mstrain-608_273e_coco.py'
+        self.detector_2 = init_detector(self.config_file, device="cuda:0")
         self.deepsort = build_tracker(cfg, use_cuda=use_cuda)
         self.class_names = self.detector.class_names
 
@@ -56,12 +79,13 @@ class VideoTracker(object):
             os.makedirs(self.args.save_path, exist_ok=True)
 
             # path of saved video and results
-            self.save_video_path = os.path.join(self.args.save_path, "results.avi")
+            self.save_video_path = os.path.join(self.args.save_path, "results.mp4")
             self.save_results_path = os.path.join(self.args.save_path, "results.txt")
 
             # create video writer
-            fourcc = cv2.VideoWriter_fourcc(*'MJPG')
-            self.writer = cv2.VideoWriter(self.save_video_path, fourcc, 20, (self.im_width, self.im_height))
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            self.fps = self.vdo.get(cv2.CAP_PROP_FPS)
+            self.writer = cv2.VideoWriter(self.save_video_path, fourcc, self.fps, (self.im_width, self.im_height))
 
             # logging
             self.logger.info("Save results to {}".format(self.args.save_path))
@@ -85,7 +109,9 @@ class VideoTracker(object):
             im = cv2.cvtColor(ori_im, cv2.COLOR_BGR2RGB)
 
             # do detection
-            bbox_xywh, cls_conf, cls_ids = self.detector(im)
+            mmdet_results = inference_detector(self.detector_2, im)
+            bbox_xywh, cls_conf, cls_ids = process_mmdet_results(mmdet_results)
+            # bbox_xywh, cls_conf, cls_ids = self.detector(im)
 
             # select person class
             mask = cls_ids == 0

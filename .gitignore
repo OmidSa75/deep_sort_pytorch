@@ -1,4 +1,5 @@
 # Folders
+.vscode/
 __pycache__/
 build/
 *.egg-info
