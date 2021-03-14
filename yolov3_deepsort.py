@@ -75,13 +75,8 @@ class VideoTracker(object):
             self.vdo = cv2.VideoCapture(args.cam)
         else:
             self.vdo = cv2.VideoCapture()
-<<<<<<< HEAD
-        self.detector = build_detector(cfg, use_cuda=use_cuda)
-        self.config_file = '../mmdetection/configs/yolo/yolov3_d53_mstrain-608_273e_coco.py'
-=======
         # self.detector = build_detector(cfg, use_cuda=use_cuda)
         self.config_file = '../../mmdetection/configs/yolo/yolov3_d53_mstrain-608_273e_coco.py'
->>>>>>> 2c71a056c84e879ca81ef655d52e52d7685db476
         self.detector_2 = init_detector(self.config_file, device="cuda:0")
         self.deepsort = build_tracker(cfg, use_cuda=use_cuda)
         # self.class_names = self.detector.class_names
