@@ -76,8 +76,10 @@ class VideoTracker(object):
         else:
             self.vdo = cv2.VideoCapture()
         # self.detector = build_detector(cfg, use_cuda=use_cuda)
+        self.checkpoint = "http://download.openmmlab.com/mmdetection/v2.0/yolo/yolov3_d53_mstrain-608_273e_coco/yolov3_d53_mstrain-608_273e_coco-139f5633.pth"
+
         self.config_file = '../../mmdetection/configs/yolo/yolov3_d53_mstrain-608_273e_coco.py'
-        self.detector_2 = init_detector(self.config_file, device="cuda:0")
+        self.detector_2 = init_detector(self.config_file, self.checkpoint, device="cuda:0")
         self.deepsort = build_tracker(cfg, use_cuda=use_cuda)
         # self.class_names = self.detector.class_names
 
@@ -125,9 +127,9 @@ class VideoTracker(object):
                 continue
 
             start = time.time()
-            _, ori_im = self.vdo.retrieve()
-            im = cv2.cvtColor(ori_im, cv2.COLOR_BGR2RGB)
-
+            _, ori_im = self.vdo.read()
+            # im = cv2.cvtColor(ori_im, cv2.COLOR_BGR2RGB)
+            im = ori_im.copy()
             # do detection
             mmdet_results = inference_detector(self.detector_2, im)
             bbox_xywh, cls_conf, cls_ids = process_mmdet_results(mmdet_results)
