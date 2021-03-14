@@ -7,7 +7,7 @@ import warnings
 import numpy as np
 
 from mmdet.apis import init_detector, inference_detector
-from detector import build_detector
+# from detector import build_detector
 from deep_sort import build_tracker
 from utils.draw import draw_boxes
 from utils.parser import get_config
@@ -45,7 +45,7 @@ def process_mmdet_results(mmdet_results, cat_id=0):
         det_results = mmdet_results
 
     persons = det_results[cat_id]
-    persons[~np.isinf(persons).any(axis=1)]
+    persons = persons[~np.isinf(persons).any(axis=1)]
     # infinit = np.isinf(persons)
 
     bboxes = _xyxy2xywh(persons[:, :4])
@@ -75,11 +75,16 @@ class VideoTracker(object):
             self.vdo = cv2.VideoCapture(args.cam)
         else:
             self.vdo = cv2.VideoCapture()
+<<<<<<< HEAD
         self.detector = build_detector(cfg, use_cuda=use_cuda)
         self.config_file = '../mmdetection/configs/yolo/yolov3_d53_mstrain-608_273e_coco.py'
+=======
+        # self.detector = build_detector(cfg, use_cuda=use_cuda)
+        self.config_file = '../../mmdetection/configs/yolo/yolov3_d53_mstrain-608_273e_coco.py'
+>>>>>>> 2c71a056c84e879ca81ef655d52e52d7685db476
         self.detector_2 = init_detector(self.config_file, device="cuda:0")
         self.deepsort = build_tracker(cfg, use_cuda=use_cuda)
-        self.class_names = self.detector.class_names
+        # self.class_names = self.detector.class_names
 
     def __enter__(self):
         if self.args.cam != -1:
