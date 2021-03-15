@@ -5,6 +5,7 @@ import argparse
 import torch
 import warnings
 import numpy as np
+from numba import njit
 
 from mmdet.apis import init_detector, inference_detector
 # from detector import build_detector
@@ -15,7 +16,8 @@ from utils.log import get_logger
 from utils.io import write_results
 
 
-def _xyxy2xywh(bbox_xyxy):
+@njit
+def _xyxy2xywh(bbox_xyxy: np.ndarray) -> np.ndarray:
     """Transform the bbox format from x1y1x2y2 to xywh.
 
     Args:
@@ -32,6 +34,7 @@ def _xyxy2xywh(bbox_xyxy):
     return bbox_xywh
 
 
+@njit
 def process_mmdet_results(mmdet_results, cat_id=0):
     """Process mmdet results, and return a list of bboxes.
 
@@ -39,16 +42,17 @@ def process_mmdet_results(mmdet_results, cat_id=0):
     :param cat_id: category id (default: 0 for human)
     :return: a list of detected bounding boxes
     """
-    if isinstance(mmdet_results, tuple):
-        det_results = mmdet_results[0]
-    else:
-        det_results = mmdet_results
+    # if isinstance(mmdet_results, tuple):
+    #     det_results = mmdet_results[0]
+    # else:
+    #     det_results = mmdet_results
 
-    persons = det_results[cat_id]
-    persons = persons[~np.isinf(persons).any(axis=1)]
+    persons = mmdet_results
+    # persons = persons[~np.isinf(persons).any(axis=1)]
     # infinit = np.isinf(persons)
 
     bboxes = _xyxy2xywh(persons[:, :4])
+    # bboxes = persons[:, :4]
     confs = persons[:, 4]
     ids = np.zeros(len(persons), dtype=np.int64)
 
@@ -78,7 +82,7 @@ class VideoTracker(object):
         # self.detector = build_detector(cfg, use_cuda=use_cuda)
         self.checkpoint = "http://download.openmmlab.com/mmdetection/v2.0/yolo/yolov3_d53_mstrain-608_273e_coco/yolov3_d53_mstrain-608_273e_coco-139f5633.pth"
 
-        self.config_file = '../../mmdetection/configs/yolo/yolov3_d53_mstrain-608_273e_coco.py'
+        self.config_file = '../mmdetection/configs/yolo/yolov3_d53_mstrain-608_273e_coco.py'
         self.detector_2 = init_detector(self.config_file, self.checkpoint, device="cuda:0")
         self.deepsort = build_tracker(cfg, use_cuda=use_cuda)
         # self.class_names = self.detector.class_names
@@ -128,11 +132,11 @@ class VideoTracker(object):
 
             start = time.time()
             _, ori_im = self.vdo.read()
-            # im = cv2.cvtColor(ori_im, cv2.COLOR_BGR2RGB)
-            im = ori_im.copy()
+            im = cv2.cvtColor(ori_im, cv2.COLOR_BGR2RGB)
+            # im = ori_im.copy()
             # do detection
             mmdet_results = inference_detector(self.detector_2, im)
-            bbox_xywh, cls_conf, cls_ids = process_mmdet_results(mmdet_results)
+            bbox_xywh, cls_conf, cls_ids = process_mmdet_results(mmdet_results[0])
             # bbox_xywh, cls_conf, cls_ids = self.detector(im)
 
             # select person class
