@@ -8,55 +8,17 @@ import numpy as np
 from numba import njit
 
 from mmdet.apis import init_detector, inference_detector
-# from detector import build_detector
+from detector import build_detector
 from deep_sort import build_tracker
 from utils.draw import draw_boxes
 from utils.parser import get_config
 from utils.log import get_logger
 from utils.io import write_results
+from utils import mmtracking_output
 
 
-@njit
-def _xyxy2xywh(bbox_xyxy: np.ndarray) -> np.ndarray:
-    """Transform the bbox format from x1y1x2y2 to xywh.
-
-    Args:
-        bbox_xyxy (np.ndarray): Bounding boxes (with scores), shaped (n, 4) or
-            (n, 5). (left, top, right, bottom, [score])
-
-    Returns:
-        np.ndarray: Bounding boxes (with scores),
-          shaped (n, 4) or (n, 5). (left, top, width, height, [score])
-    """
-    bbox_xywh = bbox_xyxy.copy()
-    bbox_xywh[:, 2] = bbox_xywh[:, 2] - bbox_xywh[:, 0] + 1
-    bbox_xywh[:, 3] = bbox_xywh[:, 3] - bbox_xywh[:, 1] + 1
-    return bbox_xywh
 
 
-@njit
-def process_mmdet_results(mmdet_results, cat_id=0):
-    """Process mmdet results, and return a list of bboxes.
-
-    :param mmdet_results:
-    :param cat_id: category id (default: 0 for human)
-    :return: a list of detected bounding boxes
-    """
-    # if isinstance(mmdet_results, tuple):
-    #     det_results = mmdet_results[0]
-    # else:
-    #     det_results = mmdet_results
-
-    persons = mmdet_results
-    # persons = persons[~np.isinf(persons).any(axis=1)]
-    # infinit = np.isinf(persons)
-
-    bboxes = _xyxy2xywh(persons[:, :4])
-    # bboxes = persons[:, :4]
-    confs = persons[:, 4]
-    ids = np.zeros(len(persons), dtype=np.int64)
-
-    return bboxes, confs, ids
 
 
 class VideoTracker(object):
@@ -79,13 +41,13 @@ class VideoTracker(object):
             self.vdo = cv2.VideoCapture(args.cam)
         else:
             self.vdo = cv2.VideoCapture()
-        # self.detector = build_detector(cfg, use_cuda=use_cuda)
+        self.detector = build_detector(cfg, use_cuda=use_cuda)
         self.checkpoint = "http://download.openmmlab.com/mmdetection/v2.0/yolo/yolov3_d53_mstrain-608_273e_coco/yolov3_d53_mstrain-608_273e_coco-139f5633.pth"
 
         self.config_file = '../mmdetection/configs/yolo/yolov3_d53_mstrain-608_273e_coco.py'
         self.detector_2 = init_detector(self.config_file, self.checkpoint, device="cuda:0")
         self.deepsort = build_tracker(cfg, use_cuda=use_cuda)
-        # self.class_names = self.detector.class_names
+        self.class_names = self.detector.class_names
 
     def __enter__(self):
         if self.args.cam != -1:
@@ -134,10 +96,12 @@ class VideoTracker(object):
             _, ori_im = self.vdo.read()
             im = cv2.cvtColor(ori_im, cv2.COLOR_BGR2RGB)
             # im = ori_im.copy()
-            # do detection
-            mmdet_results = inference_detector(self.detector_2, im)
-            bbox_xywh, cls_conf, cls_ids = process_mmdet_results(mmdet_results[0])
-            # bbox_xywh, cls_conf, cls_ids = self.detector(im)
+
+
+            '''-----------------------detection part---------------------------'''
+            # mmdet_results = inference_detector(self.detector_2, im)
+            # bbox_xywh, cls_conf, cls_ids = process_mmdet_results(mmdet_results[0])
+            bbox_xywh, cls_conf, cls_ids = self.detector(im)
 
             # select person class
             mask = cls_ids == 0
@@ -147,9 +111,16 @@ class VideoTracker(object):
             bbox_xywh[:, 3:] *= 1.2
             cls_conf = cls_conf[mask]
 
-            # do tracking
+            '''------------------------tracking part----------------------------'''
             outputs = self.deepsort.update(bbox_xywh, cls_conf, im)
 
+
+            '''------------------------pose estimation part--------------------------'''
+            # change deep sort tracking result to mmtracking results
+            mmtracking_results = mmtracking_output(outputs)
+
+
+            '''------------------------classification part---------------------------'''
             # draw boxes for visualization
             if len(outputs) > 0:
                 bbox_tlwh = []
