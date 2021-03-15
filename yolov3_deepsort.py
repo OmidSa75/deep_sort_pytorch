@@ -152,18 +152,6 @@ class VideoTracker(object):
                 return_heatmap=False,
                 outputs=None)
 
-            # vis pose results
-            vis_img = vis_pose_tracking_result(
-                self.pose_model,
-                im,
-                pose_results,
-                dataset=self.dataset,
-                kpt_score_thr=0.3,
-                show=False)
-
-            cv2.imshow('video', vis_img)
-            cv2.waitKey(1)
-
             '''------------------------classification part---------------------------'''
             # draw boxes for visualization
             if len(outputs) > 0:
