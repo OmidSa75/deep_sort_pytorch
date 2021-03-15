@@ -8,6 +8,9 @@ import numpy as np
 from numba import njit
 
 from mmdet.apis import init_detector, inference_detector
+from mmpose.apis import (inference_top_down_pose_model, init_pose_model,
+                         vis_pose_tracking_result)
+
 from detector import build_detector
 from deep_sort import build_tracker
 from utils.draw import draw_boxes
@@ -42,12 +45,17 @@ class VideoTracker(object):
         else:
             self.vdo = cv2.VideoCapture()
         self.detector = build_detector(cfg, use_cuda=use_cuda)
-        self.checkpoint = "http://download.openmmlab.com/mmdetection/v2.0/yolo/yolov3_d53_mstrain-608_273e_coco/yolov3_d53_mstrain-608_273e_coco-139f5633.pth"
-
-        self.config_file = '../mmdetection/configs/yolo/yolov3_d53_mstrain-608_273e_coco.py'
-        self.detector_2 = init_detector(self.config_file, self.checkpoint, device="cuda:0")
-        self.deepsort = build_tracker(cfg, use_cuda=use_cuda)
         self.class_names = self.detector.class_names
+        self.deepsort = build_tracker(cfg, use_cuda=use_cuda)
+
+        # self.det_checkpoint = "http://download.openmmlab.com/mmdetection/v2.0/yolo/yolov3_d53_mstrain-608_273e_coco/yolov3_d53_mstrain-608_273e_coco-139f5633.pth"
+        # self.det_config_file = '../mmdetection/configs/yolo/yolov3_d53_mstrain-608_273e_coco.py'
+        # self.detector_2 = init_detector(self.det_config_file, self.checkpoint, device="cuda:0")
+
+        self.pose_checkpoint = "https://download.openmmlab.com/mmpose/top_down/mobilenetv2/mobilenetv2_coco_384x288-26be4816_20200727.pth"
+        self.pose_config_file = "../mmpose/configs/top_down/mobilenet_v2/coco/mobilenetv2_coco_384x288.py"
+        self.pose_model = init_pose_model(self.pose_config_file, self.pose_checkpoint, device="cuda:0")
+        self.dataset = self.pose_model.cfg.data['test']['type']
 
     def __enter__(self):
         if self.args.cam != -1:
@@ -118,7 +126,15 @@ class VideoTracker(object):
             '''------------------------pose estimation part--------------------------'''
             # change deep sort tracking result to mmtracking results
             mmtracking_results = mmtracking_output(outputs)
-
+            pose_results, returned_outputs = inference_top_down_pose_model(
+                self.pose_model,
+                im,
+                mmtracking_results,
+                bbox_thr=0.3,
+                format='xyxy',
+                dataset=self.dataset,
+                return_heatmap=False,
+                outputs=None)
 
             '''------------------------classification part---------------------------'''
             # draw boxes for visualization

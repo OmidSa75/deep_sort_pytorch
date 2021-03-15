@@ -42,6 +42,8 @@ def process_track2pose(track_result):
 
 
 def mmtracking_output(deepsort_output):
+    confidense = np.full(len(deepsort_output), 0.99)
+    deepsort_output = np.c_[deepsort_output, confidense]
     person_results = []
     for track_person in deepsort_output:
         person = {}
