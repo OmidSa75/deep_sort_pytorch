@@ -1,6 +1,7 @@
 # Folders
 .vscode/
 __pycache__/
+.idea/
 build/
 *.egg-info
 

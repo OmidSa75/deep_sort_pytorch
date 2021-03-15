@@ -5,54 +5,23 @@ import argparse
 import torch
 import warnings
 import numpy as np
+from numba import njit
 
 from mmdet.apis import init_detector, inference_detector
-# from detector import build_detector
+from mmpose.apis import (inference_top_down_pose_model, init_pose_model,
+                         vis_pose_tracking_result)
+
+from detector import build_detector
 from deep_sort import build_tracker
 from utils.draw import draw_boxes
 from utils.parser import get_config
 from utils.log import get_logger
 from utils.io import write_results
+from utils import mmtracking_output
 
 
-def _xyxy2xywh(bbox_xyxy):
-    """Transform the bbox format from x1y1x2y2 to xywh.
-
-    Args:
-        bbox_xyxy (np.ndarray): Bounding boxes (with scores), shaped (n, 4) or
-            (n, 5). (left, top, right, bottom, [score])
-
-    Returns:
-        np.ndarray: Bounding boxes (with scores),
-          shaped (n, 4) or (n, 5). (left, top, width, height, [score])
-    """
-    bbox_xywh = bbox_xyxy.copy()
-    bbox_xywh[:, 2] = bbox_xywh[:, 2] - bbox_xywh[:, 0] + 1
-    bbox_xywh[:, 3] = bbox_xywh[:, 3] - bbox_xywh[:, 1] + 1
-    return bbox_xywh
 
 
-def process_mmdet_results(mmdet_results, cat_id=0):
-    """Process mmdet results, and return a list of bboxes.
-
-    :param mmdet_results:
-    :param cat_id: category id (default: 0 for human)
-    :return: a list of detected bounding boxes
-    """
-    if isinstance(mmdet_results, tuple):
-        det_results = mmdet_results[0]
-    else:
-        det_results = mmdet_results
-
-    persons = det_results[cat_id]
-    persons = persons[~np.isinf(persons).any(axis=1)]
-    # infinit = np.isinf(persons)
-
-    bboxes = _xyxy2xywh(persons[:, :4])
-    confs = persons[:, 4]
-    ids = np.zeros(len(persons), dtype=np.int64)
-
-    return bboxes, confs, ids
 
 
 class VideoTracker(object):
@@ -75,11 +44,24 @@ class VideoTracker(object):
             self.vdo = cv2.VideoCapture(args.cam)
         else:
             self.vdo = cv2.VideoCapture()
+<<<<<<< HEAD
         # self.detector = build_detector(cfg, use_cuda=use_cuda)
         self.config_file = '../../mmdetection/configs/yolo/yolov3_d53_mstrain-608_273e_coco.py'
         self.detector_2 = init_detector(self.config_file, device="cuda:0")
+=======
+        self.detector = build_detector(cfg, use_cuda=use_cuda)
+        self.class_names = self.detector.class_names
+>>>>>>> 100de5989b395c30f1766b7e7c9a1d742a621171
         self.deepsort = build_tracker(cfg, use_cuda=use_cuda)
-        # self.class_names = self.detector.class_names
+
+        # self.det_checkpoint = "http://download.openmmlab.com/mmdetection/v2.0/yolo/yolov3_d53_mstrain-608_273e_coco/yolov3_d53_mstrain-608_273e_coco-139f5633.pth"
+        # self.det_config_file = '../mmdetection/configs/yolo/yolov3_d53_mstrain-608_273e_coco.py'
+        # self.detector_2 = init_detector(self.det_config_file, self.checkpoint, device="cuda:0")
+
+        self.pose_checkpoint = "https://download.openmmlab.com/mmpose/top_down/mobilenetv2/mobilenetv2_coco_384x288-26be4816_20200727.pth"
+        self.pose_config_file = "../mmpose/configs/top_down/mobilenet_v2/coco/mobilenetv2_coco_384x288.py"
+        self.pose_model = init_pose_model(self.pose_config_file, self.pose_checkpoint, device="cuda:0")
+        self.dataset = self.pose_model.cfg.data['test']['type']
 
     def __enter__(self):
         if self.args.cam != -1:
@@ -125,6 +107,7 @@ class VideoTracker(object):
                 continue
 
             start = time.time()
+<<<<<<< HEAD
             _, ori_im = self.vdo.retrieve()
             im = cv2.cvtColor(ori_im, cv2.COLOR_BGR2RGB)
 
@@ -132,6 +115,17 @@ class VideoTracker(object):
             mmdet_results = inference_detector(self.detector_2, im)
             bbox_xywh, cls_conf, cls_ids = process_mmdet_results(mmdet_results)
             # bbox_xywh, cls_conf, cls_ids = self.detector(im)
+=======
+            _, ori_im = self.vdo.read()
+            im = cv2.cvtColor(ori_im, cv2.COLOR_BGR2RGB)
+            # im = ori_im.copy()
+
+
+            '''-----------------------detection part---------------------------'''
+            # mmdet_results = inference_detector(self.detector_2, im)
+            # bbox_xywh, cls_conf, cls_ids = process_mmdet_results(mmdet_results[0])
+            bbox_xywh, cls_conf, cls_ids = self.detector(im)
+>>>>>>> 100de5989b395c30f1766b7e7c9a1d742a621171
 
             # select person class
             mask = cls_ids == 0
@@ -141,9 +135,36 @@ class VideoTracker(object):
             bbox_xywh[:, 3:] *= 1.2
             cls_conf = cls_conf[mask]
 
-            # do tracking
+            '''------------------------tracking part----------------------------'''
             outputs = self.deepsort.update(bbox_xywh, cls_conf, im)
 
+
+            '''------------------------pose estimation part--------------------------'''
+            # change deep sort tracking result to mmtracking results
+            mmtracking_results = mmtracking_output(outputs)
+            pose_results, returned_outputs = inference_top_down_pose_model(
+                self.pose_model,
+                im,
+                mmtracking_results,
+                bbox_thr=0.3,
+                format='xyxy',
+                dataset=self.dataset,
+                return_heatmap=False,
+                outputs=None)
+
+            # vis pose results
+            vis_img = vis_pose_tracking_result(
+                self.pose_model,
+                im,
+                pose_results,
+                dataset=self.dataset,
+                kpt_score_thr=0.3,
+                show=False)
+
+            cv2.imshow('video', vis_img)
+            cv2.waitKey(1)
+
+            '''------------------------classification part---------------------------'''
             # draw boxes for visualization
             if len(outputs) > 0:
                 bbox_tlwh = []
