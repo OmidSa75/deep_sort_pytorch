@@ -44,14 +44,8 @@ class VideoTracker(object):
             self.vdo = cv2.VideoCapture(args.cam)
         else:
             self.vdo = cv2.VideoCapture()
-<<<<<<< HEAD
-        # self.detector = build_detector(cfg, use_cuda=use_cuda)
-        self.config_file = '../../mmdetection/configs/yolo/yolov3_d53_mstrain-608_273e_coco.py'
-        self.detector_2 = init_detector(self.config_file, device="cuda:0")
-=======
         self.detector = build_detector(cfg, use_cuda=use_cuda)
         self.class_names = self.detector.class_names
->>>>>>> 100de5989b395c30f1766b7e7c9a1d742a621171
         self.deepsort = build_tracker(cfg, use_cuda=use_cuda)
 
         # self.det_checkpoint = "http://download.openmmlab.com/mmdetection/v2.0/yolo/yolov3_d53_mstrain-608_273e_coco/yolov3_d53_mstrain-608_273e_coco-139f5633.pth"
@@ -107,15 +101,6 @@ class VideoTracker(object):
                 continue
 
             start = time.time()
-<<<<<<< HEAD
-            _, ori_im = self.vdo.retrieve()
-            im = cv2.cvtColor(ori_im, cv2.COLOR_BGR2RGB)
-
-            # do detection
-            mmdet_results = inference_detector(self.detector_2, im)
-            bbox_xywh, cls_conf, cls_ids = process_mmdet_results(mmdet_results)
-            # bbox_xywh, cls_conf, cls_ids = self.detector(im)
-=======
             _, ori_im = self.vdo.read()
             im = cv2.cvtColor(ori_im, cv2.COLOR_BGR2RGB)
             # im = ori_im.copy()
@@ -125,7 +110,6 @@ class VideoTracker(object):
             # mmdet_results = inference_detector(self.detector_2, im)
             # bbox_xywh, cls_conf, cls_ids = process_mmdet_results(mmdet_results[0])
             bbox_xywh, cls_conf, cls_ids = self.detector(im)
->>>>>>> 100de5989b395c30f1766b7e7c9a1d742a621171
 
             # select person class
             mask = cls_ids == 0
