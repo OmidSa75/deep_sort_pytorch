@@ -13,15 +13,10 @@ from mmpose.apis import (inference_top_down_pose_model, init_pose_model,
 
 from detector import build_detector
 from deep_sort import build_tracker
-from utils.draw import draw_boxes
 from utils.parser import get_config
 from utils.log import get_logger
 from utils.io import write_results
-from utils import mmtracking_output
-
-
-
-
+from utils import mmtracking_output, draw_boxes, draw_bbox_keypoints
 
 
 class VideoTracker(object):
@@ -105,7 +100,6 @@ class VideoTracker(object):
             im = cv2.cvtColor(ori_im, cv2.COLOR_BGR2RGB)
             # im = ori_im.copy()
 
-
             '''-----------------------detection part---------------------------'''
             # mmdet_results = inference_detector(self.detector_2, im)
             # bbox_xywh, cls_conf, cls_ids = process_mmdet_results(mmdet_results[0])
@@ -122,7 +116,6 @@ class VideoTracker(object):
             '''------------------------tracking part----------------------------'''
             outputs = self.deepsort.update(bbox_xywh, cls_conf, im)
 
-
             '''------------------------pose estimation part--------------------------'''
             # change deep sort tracking result to mmtracking results
             mmtracking_results = mmtracking_output(outputs)
@@ -137,17 +130,20 @@ class VideoTracker(object):
                 outputs=None)
 
             '''------------------------classification part---------------------------'''
+
+            '''------------------------draw part-------------------------'''
+            ori_im = draw_bbox_keypoints(ori_im, pose_results)
             # draw boxes for visualization
-            if len(outputs) > 0:
-                bbox_tlwh = []
-                bbox_xyxy = outputs[:, :4]
-                identities = outputs[:, -1]
-                ori_im = draw_boxes(ori_im, bbox_xyxy, identities)
-
-                for bb_xyxy in bbox_xyxy:
-                    bbox_tlwh.append(self.deepsort._xyxy_to_tlwh(bb_xyxy))
-
-                results.append((idx_frame - 1, bbox_tlwh, identities))
+            # if len(outputs) > 0:
+            #     bbox_tlwh = []
+            #     bbox_xyxy = outputs[:, :4]
+            #     identities = outputs[:, -1]
+            #     # ori_im = draw_boxes(ori_im, bbox_xyxy, identities)
+            #
+            #     for bb_xyxy in bbox_xyxy:
+            #         bbox_tlwh.append(self.deepsort._xyxy_to_tlwh(bb_xyxy))
+            #
+            #     results.append((idx_frame - 1, bbox_tlwh, identities))
 
             end = time.time()
 
