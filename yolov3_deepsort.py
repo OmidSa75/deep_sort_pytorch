@@ -12,7 +12,7 @@ from mmpose.apis import (inference_top_down_pose_model, init_pose_model,
                          vis_pose_tracking_result)
 
 from detector import build_detector
-from YoloV4Scaled import ScaledYoloV4
+# from YoloV4Scaled import ScaledYoloV4
 from deep_sort import build_tracker
 from utils.parser import get_config
 from utils.log import get_logger
@@ -42,7 +42,9 @@ class VideoTracker(object):
             self.vdo = cv2.VideoCapture()
 
         # self.detector = build_detector(cfg, use_cuda=use_cuda)
-        self.detector = ScaledYoloV4()
+        # self.detector = ScaledYoloV4()
+        self.detector = torch.hub.load('ultralytics/yolov5', 'yolov5s')
+        self.detector.conf = 0.6
         # self.class_names = self.detector.class_names
         self.deepsort = build_tracker(cfg, use_cuda=use_cuda)
 
@@ -106,10 +108,16 @@ class VideoTracker(object):
             '''-----------------------detection part---------------------------'''
             # mmdet_results = inference_detector(self.detector_2, im)
             # bbox_xywh, cls_conf, cls_ids = process_mmdet_results(mmdet_results[0])
-            tic = time.time()
-            bbox_xywh, cls_conf, cls_ids = self.detector(im)
-            tac = time.time()
-            print("\033[1;34m" + str(1 / (tac - tic)))
+            # tic = time.time()
+            # bbox_xywh, cls_conf, cls_ids = self.detector(im)
+            # tac = time.time()
+            # print("\033[1;34m" + str(1 / (tac - tic)))
+            pred = self.detector(im).xywh
+            pred = pred[0]
+            bbox = pred[:, :4]
+            bbox_xywh = bbox.cpu().numpy()
+            cls_conf = pred[:, 4].cpu().numpy()
+            cls_ids = pred[:, 5].long().cpu().numpy()
 
             # select person class
             mask = cls_ids == 0
