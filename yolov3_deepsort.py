@@ -4,14 +4,15 @@ import time
 import argparse
 import torch
 import warnings
-import numpy as np
-from numba import njit
+import sys
+# sys.path.insert(0, 'detector/ScaledYOLOv4')
 
 from mmdet.apis import init_detector, inference_detector
 from mmpose.apis import (inference_top_down_pose_model, init_pose_model,
                          vis_pose_tracking_result)
 
 from detector import build_detector
+from YoloV4Scaled import ScaledYoloV4
 from deep_sort import build_tracker
 from utils.parser import get_config
 from utils.log import get_logger
@@ -39,8 +40,10 @@ class VideoTracker(object):
             self.vdo = cv2.VideoCapture(args.cam)
         else:
             self.vdo = cv2.VideoCapture()
-        self.detector = build_detector(cfg, use_cuda=use_cuda)
-        self.class_names = self.detector.class_names
+
+        # self.detector = build_detector(cfg, use_cuda=use_cuda)
+        self.detector = ScaledYoloV4()
+        # self.class_names = self.detector.class_names
         self.deepsort = build_tracker(cfg, use_cuda=use_cuda)
 
         # self.det_checkpoint = "http://download.openmmlab.com/mmdetection/v2.0/yolo/yolov3_d53_mstrain-608_273e_coco/yolov3_d53_mstrain-608_273e_coco-139f5633.pth"
@@ -103,7 +106,10 @@ class VideoTracker(object):
             '''-----------------------detection part---------------------------'''
             # mmdet_results = inference_detector(self.detector_2, im)
             # bbox_xywh, cls_conf, cls_ids = process_mmdet_results(mmdet_results[0])
+            tic = time.time()
             bbox_xywh, cls_conf, cls_ids = self.detector(im)
+            tac = time.time()
+            print("\033[1;34m" + str(1 / (tac - tic)))
 
             # select person class
             mask = cls_ids == 0
